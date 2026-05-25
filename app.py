@@ -1,213 +1,132 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
+import saw_preprocessing as saw
 
 # ==========================================
-# 1. KONFIGURASI UTAMA & GUI
+# 1. MAIN CONFIGURATION & GUI
 # ==========================================
 st.set_page_config(
-    page_title="SPK Hotel Bali | SAW", 
+    page_title="DSS Hotel Bali | SAW", 
     page_icon="🏨", 
     layout="wide"
 )
 
-st.title("🏨 Sistem Cerdas Pendukung Keputusan Pemilihan Hotel di Bali")
+st.title("🏨 Smart Decision Support System for Hotel Selection in Bali")
 st.markdown(
     """
-    Aplikasi ini menggunakan metode **Simple Additive Weighting (SAW)** untuk memberikan rekomendasi 
-    hotel terbaik di Bali menggunakan data riil (beserta nama asli hotel).
+    This application uses the **Simple Additive Weighting (SAW)** method to provide 
+    the best hotel recommendations in Bali using real data.
     """
 )
 
 # ==========================================
-# 2. FUNGSI LOGIKA METODE SAW
+# 2. DATASET LOADING
 # ==========================================
+# Wrap data loading function
 @st.cache_data
-def load_and_preprocess_data(file_path):
-    # 1. Baca data & usir karakter gaib (BOM)
-    df = pd.read_csv(file_path, sep=',', encoding='utf-8-sig', on_bad_lines='skip')
-    
-    if len(df.columns) == 1:
-        df = pd.read_csv(file_path, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
-        
-    # 2. PENCARIAN KOLOM OTOMATIS
-    col_title = [c for c in df.columns if 'Title' in c][0]
-    col_price = [c for c in df.columns if 'Price' in c][0]
-    col_rating = [c for c in df.columns if 'Rating' in c][0]
-    col_review = [c for c in df.columns if 'Review' in c][0]
-    col_star = [c for c in df.columns if 'Star' in c][0]
-    
-    kriteria_kolom = [col_title, col_price, col_rating, col_review, col_star]
-    
-    # 3. Filter data kriteria
-    df = df.dropna(subset=kriteria_kolom).head(300).copy()
-    df['Alternatif (Hotel)'] = df[col_title]
-    
-    # 4. Olah kolom Fasilitas jadi angka
-    col_fac = [c for c in df.columns if 'Facilit' in c]
-    if col_fac:
-        df['Jumlah Fasilitas'] = df[col_fac[0]].apply(lambda x: len(str(x).split(',')) if pd.notnull(x) else 1)
-    else:
-        df['Jumlah Fasilitas'] = 1
-        
-    columns_to_keep = [
-        'Alternatif (Hotel)', 
-        col_price, 
-        col_rating, 
-        col_star, 
-        col_review,
-        'Jumlah Fasilitas'
-    ]
-    
-    df_raw = df[columns_to_keep].copy()
-    
-    # 5. RENAME PAKSA
-    df_matrix = df_raw.copy()
-    df_matrix.columns = [
-        'Alternatif (Hotel)', 
-        'C1 (Harga)', 
-        'C2 (Rating)', 
-        'C3 (Bintang)', 
-        'C4 (Ulasan)', 
-        'C5 (Fasilitas)'
-    ]
-    
-    # 6. PEMBERSIHAN ANGKA (Solusi Error '4,8')
-    # a. Bersihkan C1 (Harga) - Hapus huruf, titik ribuan, Rp (sisakan angka murni)
-    df_matrix['C1 (Harga)'] = df_matrix['C1 (Harga)'].astype(str).replace(r'[^\d]', '', regex=True)
-    
-    # b. Ganti koma (,) menjadi titik (.) agar dikenali Python sebagai desimal
-    for col in ['C2 (Rating)', 'C3 (Bintang)', 'C4 (Ulasan)']:
-        df_matrix[col] = df_matrix[col].astype(str).str.replace(',', '.')
-        
-    # c. Ubah SEMUA kriteria menjadi format angka ukur baku (Float)
-    for col in df_matrix.columns:
-        if col != 'Alternatif (Hotel)':
-            df_matrix[col] = pd.to_numeric(df_matrix[col], errors='coerce')
-            
-    df_matrix = df_matrix.dropna()
-    
-    df_matrix.set_index('Alternatif (Hotel)', inplace=True)
-    return df_raw, df_matrix
+def get_data():
+    return saw.load_and_preprocess_data("dataset/Updated_ScrapingHotelTiketcom.csv")
 
-def calculate_normalization(df_matrix, atribut):
-    df_norm = df_matrix.copy().astype(float)
-    for i, col in enumerate(df_matrix.columns):
-        if atribut[i] == 0:  # Atribut Cost
-            min_val = df_matrix[col].min()
-            df_norm[col] = min_val / df_matrix[col]
-        else:  # Atribut Benefit
-            max_val = df_matrix[col].max()
-            df_norm[col] = df_matrix[col] / max_val
-    return df_norm
-
-def calculate_final_score(df_matrix, df_norm, weights):
-    W = np.array(weights)
-    scores = df_norm.values.dot(W) 
-    
-    df_final = df_matrix.copy()
-    df_final['Skor Akhir'] = scores
-    df_final = df_final.reset_index()
-    df_final = df_final.sort_values(by='Skor Akhir', ascending=False).reset_index(drop=True)
-    return df_final
-
-# ==========================================
-# 3. PEMUATAN DATASET
-# ==========================================
 try:
-    # Memanggil dataset dari dalam folder dataset
-    df_raw, df_matrix = load_and_preprocess_data("dataset/Updated_ScrapingHotelTiketcom.csv")
+    df_raw, df_matrix = get_data()
 except FileNotFoundError:
-    st.error("❌ Dataset tidak ditemukan. Pastikan file CSV Bali berada di dalam folder 'dataset/'.")
+    st.error("❌ Dataset not found. Please ensure the Bali CSV file is inside the 'dataset/' folder.")
     st.stop()
 
 # ==========================================
-# 4. SIDEBAR (Widget Dinamis)
+# 3. SIDEBAR
 # ==========================================
-st.sidebar.header("⚙️ Pengaturan Bobot Kriteria")
-st.sidebar.markdown("Total seluruh kriteria harus berjumlah tepat 100.")
+st.sidebar.header("⚙️ Criteria Weights Settings")
+st.sidebar.markdown("The total of all criteria weights must be exactly 100.")
 st.sidebar.markdown("---")
 
-w_c1 = st.sidebar.slider("Bobot C1 (Harga) [Cost]", 0, 100, 30, step=5)
-w_c2 = st.sidebar.slider("Bobot C2 (Rating) [Benefit]", 0, 100, 20, step=5)
-w_c3 = st.sidebar.slider("Bobot C3 (Bintang) [Benefit]", 0, 100, 15, step=5)
-w_c4 = st.sidebar.number_input("Bobot C4 (Ulasan) [Benefit]", min_value=0, max_value=100, value=15, step=5)
-w_c5 = st.sidebar.number_input("Bobot C5 (Fasilitas) [Benefit]", min_value=0, max_value=100, value=20, step=5)
+w_c1 = st.sidebar.slider("C1 Weight (Price) [Cost]", 0, 100, 30, step=5)
+w_c2 = st.sidebar.slider("C2 Weight (Rating) [Benefit]", 0, 100, 20, step=5)
+w_c3 = st.sidebar.slider("C3 Weight (Star) [Benefit]", 0, 100, 15, step=5)
+w_c4 = st.sidebar.number_input("C4 Weight (Reviews) [Benefit]", min_value=0, max_value=100, value=15, step=5)
+w_c5 = st.sidebar.number_input("C5 Weight (Facilities) [Benefit]", min_value=0, max_value=100, value=20, step=5)
 
-total_bobot = w_c1 + w_c2 + w_c3 + w_c4 + w_c5
+total_weight = w_c1 + w_c2 + w_c3 + w_c4 + w_c5
 st.sidebar.markdown("---")
 
-is_weight_valid = (total_bobot == 100)
+is_weight_valid = (total_weight == 100)
 
 if not is_weight_valid:
-    st.sidebar.error(f"⚠️ Total bobot: **{total_bobot}**. Jumlah harus 100.")
+    st.sidebar.error(f"⚠️ Current total weight: **{total_weight}**. It must be exactly 100.")
 else:
-    st.sidebar.success("✅ Total bobot valid (100).")
+    st.sidebar.success("✅ Total weight is valid (100).")
 
 W = [w_c1 / 100, w_c2 / 100, w_c3 / 100, w_c4 / 100, w_c5 / 100]
-atribut = [0, 1, 1, 1, 1]  # Harga adalah Cost (0), sisanya Benefit (1)
+attributes = [0, 1, 1, 1, 1] 
 
-df_norm = calculate_normalization(df_matrix, atribut)
+# Preprocessing file call normalization
+df_norm = saw.calculate_normalization(df_matrix, attributes)
 
 # ==========================================
-# 5. TABS & PERHITUNGAN
+# 4. TABS & CALCULATION
 # ==========================================
-tab_profil, tab_data, tab_norm, tab_hitung, tab_grafik = st.tabs([
-    "👥 Profil Kelompok", "📊 Matriks (X)", "🔄 Normalisasi (R)", "🏆 Hasil (V)", "📈 Visualisasi"
+tab_profile, tab_data, tab_norm, tab_calc, tab_chart = st.tabs([
+    "👥 Group Profile", "📊 Matrix (X)", "🔄 Normalization (R)", "🏆 Result (V)", "📈 Visualization"
 ])
 
-with tab_profil:
-    st.subheader("👥 Profil Anggota Kelompok Pengembang")
+with tab_profile:
+    st.subheader("👥 Developer Group Profile")
     col1, col2 = st.columns(2)
     with col1:
-        st.info("### Anggota 1\n* **Nama:** Adhafa Joan Putranto\n* **NIM:** 123240069\n* **Peran:** Data Preprocessing & Analis Model")
+        st.info("### Member 1\n* **Name:** Adhafa Joan Putranto\n* **NIM:** 123240069\n* **Role:** Data Preprocessing & Model Analyst")
     with col2:
-        st.success("### Anggota 2\n* **Nama:** Muhammad Farelino Kelfin\n* **NIM:** 123240205\n* **Peran:** Developer GUI Streamlit & Algoritma Sistem")
+        st.success("### Member 2\n* **Name:** Muhammad Farelino Kelfin\n* **NIM:** 123240205\n* **Role:** Streamlit GUI Developer & System Algorithm")
 
 with tab_data:
-    st.subheader("1. Matriks Keputusan Awal (X)")
+    st.subheader("1. Initial Decision Matrix (X)")
     st.dataframe(df_matrix, use_container_width=True)
 
 with tab_norm:
-    st.subheader("2. Matriks Hasil Normalisasi (R)")
+    st.subheader("2. Normalized Matrix (R)")
     st.dataframe(
         df_norm.style.format("{:.4f}"),
         use_container_width=True
     )
 
-with tab_hitung:
-    st.subheader("3. Perhitungan Nilai Preferensi (V)")
+with tab_calc:
+    st.subheader("3. Preference Value Calculation (V)")
     
     if is_weight_valid:
-        hitung_button = st.button("🚀 Hitung Perangkingan SPK", type="primary")
-        if hitung_button:
-            st.session_state['df_final_result'] = calculate_final_score(df_matrix, df_norm, W)
-            st.success("🎉 Berhasil dieksekusi!")
+        with st.form(key="saw_calculation_form"):
+            st.markdown("Click the button below to explore the hotel recommendation rankings.")
+            calc_button = st.form_submit_button("🚀 Calculate DSS Ranking", type="primary")
             
-        if 'df_final_result' in st.session_state:
+            if calc_button:
+                # Call final score calculation from preprocessing file
+                st.session_state['df_final_result'] = saw.calculate_final_score(df_matrix, df_norm, W)
+                st.session_state['show_results'] = True
+                
+        # Display result outside the form container
+        if st.session_state.get('show_results', False) and 'df_final_result' in st.session_state:
+            st.success("🎉 Successfully executed!")
             df_display = st.session_state['df_final_result']
             st.dataframe(
                 df_display.style.format({
-                    "Skor Akhir": "{:.4f}",
-                    "C1 (Harga)": "Rp {:,.0f}",
+                    "Final Score": "{:.4f}",
+                    "C1 (Price)": "Rp {:,.0f}",
                     "C2 (Rating)": "{:.1f}",
-                    "C3 (Bintang)": "{:.0f}",
-                    "C4 (Ulasan)": "{:.0f}",
-                    "C5 (Fasilitas)": "{:.0f}"
-                }).background_gradient(cmap="Greens", subset=["Skor Akhir"]),
+                    "C3 (Star)": "{:.0f}",
+                    "C4 (Reviews)": "{:.0f}",
+                    "C5 (Facilities)": "{:.0f}"
+                }).background_gradient(cmap="Greens", subset=["Final Score"]),
                 use_container_width=True
             )
-            top_alt = df_display.iloc[0]['Alternatif (Hotel)']
-            top_score = df_display.iloc[0]['Skor Akhir']
-            st.success(f"🏅 **Rekomendasi Terbaik:** Hotel **{top_alt}** dengan nilai **{top_score:.4f}**.")
+            top_alt = df_display.iloc[0]['Alternative (Hotel)']
+            top_score = df_display.iloc[0]['Final Score']
+            st.success(f"🏅 **Best Recommendation:** Hotel **{top_alt}** with a score of **{top_score:.4f}**.")
     else:
-        st.error("❌ Sesuaikan bobot hingga total 100 untuk menghitung.")
+        st.error("❌ Adjust the weights until the total is 100 to calculate.")
+        st.session_state['show_results'] = False
 
-with tab_grafik:
-    st.subheader("4. Top 15 Hotel Terbaik")
-    if is_weight_valid and 'df_final_result' in st.session_state:
+with tab_chart:
+    st.subheader("4. Top 15 Best Hotels")
+    if is_weight_valid and st.session_state.get('show_results', False) and 'df_final_result' in st.session_state:
         df_chart = st.session_state['df_final_result'].head(15)
-        chart_data = df_chart[['Alternatif (Hotel)', 'Skor Akhir']].set_index('Alternatif (Hotel)')
+        chart_data = df_chart[['Alternative (Hotel)', 'Final Score']].set_index('Alternative (Hotel)')
         st.bar_chart(chart_data, color="#2ECC71")
     else:
-        st.info("Hitung data terlebih dahulu di Tab Hasil.")
+        st.info("Calculate the data first in the Result Tab.")
