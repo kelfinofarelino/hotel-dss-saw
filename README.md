@@ -46,3 +46,21 @@ This system utilizes 5 main criteria to determine the utility value of the hotel
 * **Data Analysis Libraries:** Pandas, NumPy
 
 ---
+
+## 📂 Project Structure
+
+The directory structure of this project is organized as follows:
+
+```text
+hotel-dss-saw/
+│
+├── dataset/
+│   └── Updated_ScrapingHotelTiketcom.csv  # Raw dataset from Kaggle
+│
+├── __pycache__/                           # Compiled Python bytecode files
+├── .gitignore                             # Ignore untracked files 
+├── app.py                                 # Main Streamlit GUI
+├── README.md                              # Repository documentation
+├── requirements.txt                       # List dependencies & libraries
+└── saw_preprocessing.py                   # Logic and Formula
+```
