@@ -6,8 +6,8 @@ Repositori ini berisi proyek akhir untuk mata kuliah **Praktikum Sistem Cerdas P
 
 ## 👥 Identitas Kelompok (Plug-H)
 Proyek ini dikembangkan oleh:
-* **Adhafa Joan Putranto** (123240069) — [GitHub Profile](https://github.com/adhafajp)
-* **Muhammad Farelino Kelfin** (123240205) — [GitHub Profile](https://github.com/kelfinofarelino)
+* **Adhafa Joan Putranto** (123240069) — [adhafajp](https://github.com/adhafajp)
+* **Muhammad Farelino Kelfin** (123240205) — [kelfinofarelino](https://github.com/kelfinofarelino)
 
 ---
 
