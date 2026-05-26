@@ -9,11 +9,11 @@ def load_and_preprocess_data(file_path):
         df = pd.read_csv(file_path, sep=';', encoding='utf-8-sig', on_bad_lines='skip')
         
     # 2. AUTOMATIC COLUMN DETECTION
-    col_title = [c for c in df.columns if 'Title' in c][0]
-    col_price = [c for c in df.columns if 'Price' in c][0]
-    col_rating = [c for c in df.columns if 'Rating' in c][0]
-    col_review = [c for c in df.columns if 'Review' in c][0]
-    col_star = [c for c in df.columns if 'Star' in c][0]
+    col_title = 'Title'
+    col_price = 'Price Starts From'
+    col_rating = 'Rating'
+    col_review = 'Review Count'
+    col_star = 'Star Hotel/Villa/Resort'
     
     criteria_columns = [col_title, col_price, col_rating, col_review, col_star]
     
@@ -33,10 +33,11 @@ def load_and_preprocess_data(file_path):
     df = df.head(300).copy()
     df['Alternative (Hotel)'] = df[col_title]
     
-    # 4. Process the Facilities column into numeric counts
+# 4. Process the Facilities column into numeric counts (Proxy based on string length)
     col_fac = [c for c in df.columns if 'Facilit' in c]
     if col_fac:
-        df['Facility Count'] = df[col_fac[0]].apply(lambda x: len(str(x).split(',')) if pd.notnull(x) else 1)
+        # Menghitung panjang string karakter, bukan split koma
+        df['Facility Count'] = df[col_fac[0]].apply(lambda x: len(str(x)) if pd.notnull(x) else 0)
     else:
         df['Facility Count'] = 1
         
