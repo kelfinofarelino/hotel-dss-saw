@@ -33,7 +33,7 @@ def load_and_preprocess_data(file_path):
     df = df.head(300).copy()
     df['Alternative (Hotel)'] = df[col_title]
     
-# 4. Process the Facilities column into numeric counts (Proxy based on string length)
+    # 4. Process the Facilities column into numeric counts (Proxy based on string length)
     col_fac = [c for c in df.columns if 'Facilit' in c]
     if col_fac:
         # Menghitung panjang string karakter, bukan split koma
